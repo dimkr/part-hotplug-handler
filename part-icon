@@ -1,0 +1,160 @@
+#!/bin/dash
+
+# part-icon: a utility script for adding and removing ROX-Filer pinboard icons
+#            for partitions
+
+# the ROX-Filer command line used for RPC
+ROX_RPC_COMMAND_LINE="rox-filer -R"
+
+# _get_partition_icon()
+# purpose: determines which icon should be used to represent a partition
+# input  : the mount point and device node path of a partition
+# output : an icon path
+_get_partition_icon() {
+	# choose the partition icon, according to the device node name
+	case "$2" in
+		*floppy*)
+			type="floppy"
+			;;
+		*mmc*)
+			type="card"
+			;;
+		*cdrom*|*sr*)
+			type="optical"
+			;;
+		*sd*)
+			type="usbdrv"
+			;;
+		*)
+			type="drive"
+			;;
+	esac
+
+	# if the partition is mounted, add a suffix to the icon name
+	mountpoint -q "$1"
+	if [ 0 -eq $? ]
+	then
+		suffix="_mntd"
+	else
+		suffix=""
+	fi
+
+	echo -n "/usr/local/lib/X11/pixmaps/${type}${suffix}48.png"
+}
+
+# _update_partition_icon()
+# purpose: changes the icon of a partition to the most suitable one
+# input : a partition name
+# output: -
+_update_partition_icon() {
+		echo -n "<?xml version=\"1.0\"?>
+<env:Envelope xmlns:env=\"http://www.w3.org/2001/12/soap-envelope\">
+	<env:Body xmlns=\"http://rox.sourceforge.net/SOAP/ROX-Filer\">
+	<SetIcon>
+		<Path>$HOME/.part-hotplug-handler/$1</Path>
+		<Icon>$(_get_partition_icon /mnt/$1 $1)</Icon>
+	</SetIcon>
+</env:Body>
+</env:Envelope>" | $ROX_RPC_COMMAND_LINE
+}
+
+case "$1" in
+	add)
+		# check the command-line usage
+		if [ 3 -ne $# ]
+		then
+			echo "Usage: part-icon remove PARTITION DEVICE_NODE"
+			exit 1
+		fi
+
+		# create a directory for the partition mounting scripts
+		[ ! -d $HOME/.part-hotplug-handler ] && \
+		                                       mkdir $HOME/.part-hotplug-handler
+
+		# create the partition mounting script
+		echo -n "#!/bin/sh
+
+# if the mount point exists already, check whether the partition is mounted
+if [ -d /mnt/$2 ]
+then
+	mountpoint -q /mnt/$2
+	[ 0 -eq \$? ] && exec xdg-open /mnt/$2
+else
+	# create a mount point
+	mkdir /mnt/$2
+	[ 0 -ne \$? ] && exit 1
+fi
+
+# mount the partition
+mount \"$3\" /mnt/$2
+[ 0 -ne \$? ] && exit 1
+
+# once the partition is mounted, update its icon
+part-icon update $2
+
+# open the mount point
+exec xdg-open /mnt/$2" > $HOME/.part-hotplug-handler/$2
+		chmod 755 $HOME/.part-hotplug-handler/$2
+
+		# set the icon used
+		_update_partition_icon $2
+
+		# add a pinboard icon
+		echo -n "<?xml version=\"1.0\"?>
+<env:Envelope xmlns:env=\"http://www.w3.org/2001/12/soap-envelope\">
+	<env:Body xmlns=\"http://rox.sourceforge.net/SOAP/ROX-Filer\">
+		<PinboardAdd>
+			<Path>$HOME/.part-hotplug-handler/$2</Path>
+			<Label>$2</Label>
+			<Args></Args>
+		</PinboardAdd>
+	</env:Body>
+</env:Envelope>" | $ROX_RPC_COMMAND_LINE
+		;;
+
+	remove)
+		# check the command-line usage
+		if [ 2 -ne $# ]
+		then
+			echo "Usage: part-icon remove PARTITION"
+			exit 1
+		fi
+
+		# unmount the partition and delete the mount point
+		if [ -d /mnt/$2 ]
+		then
+			mountpoint -q /mnt/$2
+			if [ 0 -eq $? ]
+			then
+				umount /mnt/$2
+				[ 0 -eq $? ] && rmdir /mnt/$2
+			fi
+		fi
+
+		# remove the pinboard icon
+		echo -n "<?xml version=\"1.0\"?>
+<env:Envelope xmlns:env=\"http://www.w3.org/2001/12/soap-envelope\">
+	<env:Body xmlns=\"http://rox.sourceforge.net/SOAP/ROX-Filer\">
+		<PinboardRemove>
+			<Path>$HOME/.part-hotplug-handler/$2</Path>
+			<Args></Args>
+		</PinboardRemove>
+	</env:Body>
+</env:Envelope>" | $ROX_RPC_COMMAND_LINE
+
+		# remove the partition mounting script
+		rm -f $HOME/.part-hotplug-handler/$2
+		;;
+
+	update)
+		# check the command-line usage
+		if [ 2 -ne $# ]
+		then
+			echo "Usage: part-icon update PARTITION"
+			exit 1
+		fi
+
+		# update the partition icon
+		_update_partition_icon "$2"
+		;;
+esac

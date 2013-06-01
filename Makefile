@@ -5,6 +5,7 @@ LDFLAGS = $(shell pkg-config --libs libudev)
 
 # installation stuff
 PREFIX ?= /usr
+BIN_DIR ?= $(PREFIX)/bin
 SBIN_DIR ?= $(PREFIX)/sbin
 
 %.o: %.c
@@ -19,7 +20,9 @@ clean:
 install: part-hotplug-monitor
 	install -v -m 755 -D part-hotplug-monitor $(SBIN_DIR)/part-hotplug-monitor
 	install -v -m 755 -D part-hotplug-handler $(SBIN_DIR)/part-hotplug-handler
+	install -v -m 755 -D part-icon $(BIN_DIR)/part-icon
 
 uninstall:
+	rm -v -f $(BIN_DIR)/part-icon
 	rm -v -f $(SBIN_DIR)/part-hotplug-handler
 	rm -v -f $(SBIN_DIR)/part-hotplug-monitor
