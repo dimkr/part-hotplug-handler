@@ -24,7 +24,7 @@ case "$ACTION" in
 		[ 0 -ne $? ] && exit 1
 
 		# open the mount point
-		xdg-open /mnt/$device_name
+		exec xdg-open /mnt/$device_name
 		;;
 
 	remove)
