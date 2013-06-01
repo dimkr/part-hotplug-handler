@@ -1,0 +1,10 @@
+part-hotplug-handler is a lightweight, udev-based process which waits for
+partition-related events and runs a handler process, which can be used for the
+creation of UI elements (e.g a partitions menu), automatic mounting and more.
+
+part-hotplug-handler can be used with any Linux (http://www.kernel.org/)
+distribution with udev, although its primary goal is to replace the
+pup_event_frontend_d script used by Puppy Linux (http://www.puppylinux.org/).
+
+part-hotplug-handler is licensed under a 2-clause BSD license, see COPYING for
+the license text. For a list of its authors, see AUTHORS.
