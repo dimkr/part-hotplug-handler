@@ -1,0 +1,49 @@
+#!/bin/sh
+
+# part-hotplug-handler: a handler executed by part-hotplug-monitor when a
+#                       partition-related event occurs; the partition details
+#                       (e.g its name) are passed through the environment
+
+case "$ACTION" in
+	add)
+		# get the partition name
+		device_name="${DEVNAME##*/}"
+
+		if [ -d /mnt/$device_name ]
+		then
+			mountpoint -q /mnt/$device_name
+			[ 0 -eq $? ] && exec xdg-open /mnt/$device_name
+		else
+			# create a mount point
+			mkdir /mnt/$device_name
+			[ 0 -ne $? ] && exit 1
+		fi
+
+		# mount the partition
+		mount "$DEVNAME" /mnt/$device_name
+		[ 0 -ne $? ] && exit 1
+
+		# open the mount point
+		xdg-open /mnt/$device_name
+		;;
+
+	remove)
+		# get the partition name
+		device_name="${DEVNAME##*/}"
+
+		if [ -d /mnt/$device_name ]
+		then
+			mountpoint -q /mnt/$device_name
+			if [ 0 -eq $? ]
+			then
+				# unmount the partition and delete the mount point
+				umount /mnt/$device_name
+				[ 0 -eq $? ] && rmdir /mnt/$device_name
+			fi
+		fi
+		;;
+
+	change)
+		# when a change event occurs, do nothing
+		;;
+esac
